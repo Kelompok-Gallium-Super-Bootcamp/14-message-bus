@@ -2,6 +2,7 @@ const mime = require('mime-types');
 // eslint-disable-next-line no-unused-vars
 const { Readable } = require('stream');
 const { Client } = require('minio');
+require('dotenv').config();
 
 /**
  * set MINIO_ROOT_USER=local-minio
@@ -11,8 +12,8 @@ const minioClient = new Client({
   endPoint: '127.0.0.1',
   port: 9000,
   useSSL: false,
-  accessKey: 'minio',
-  secretKey: 'miniostorage',
+  accessKey: process.env.MINIO_ACCESS,
+  secretKey: process.env.MINIO_SECRET,
 });
 
 /**

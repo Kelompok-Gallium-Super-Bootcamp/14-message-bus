@@ -5,14 +5,33 @@ const { defineTask } = require('../tasks/task.model');
 const { defineWorker } = require('../workers/model');
 require('dotenv').config();
 
+exports.orm;
 let worker, task;
+
+/**
+ * connect and sync database schema
+ * @param {string} database database name
+ * @param {string} username connection username
+ * @param {string} password caonnection password
+ * @param {any} config additional sequelize configs
+ */
+exports.connect = async function (database, username, password, config) {
+  exports.orm = new Sequelize(database, username, password, {
+    ...config,
+    logging: false,
+    timestamps: false,
+  });
+  exports.orm.authenticate();
+  initRelationship();
+  exports.orm.sync({ alter: true });
+};
 
 function setupRelationship(orm) {
   worker = defineWorker(orm);
-  task = defineTask(orm);
+  taskModel.defineModel(exports.orm);
 
-  task.belongsTo(worker, {
-    onDelete: 'cascade',
+  taskModel.model.belongsTo(worker, {
+    onDelete: 'cascade', // set null, restrict
     foreignKey: 'assignee_id',
   });
 }

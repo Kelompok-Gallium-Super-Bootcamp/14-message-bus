@@ -102,6 +102,7 @@ async function listSvc(req, res) {
     res.end();
   } catch (err) {
     res.statusCode = 500;
+    res.write(err);
     res.end();
     return;
   }

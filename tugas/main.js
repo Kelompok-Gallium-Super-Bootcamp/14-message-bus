@@ -28,6 +28,36 @@ async function kvdb() {
   }
 }
 
+/**
+ * intiate database and other stroage dependency
+ */
+async function relationshipInit() {
+  try {
+    console.log('connect to database');
+    process.env.DB_ENGINE_TYPE == 'sqlite'
+      ? new Sequelize('', '', '', {
+          storage: path.join(__dirname, '../', process.env.DB_FILE),
+          dialect: process.env.DB_DIALECT,
+          logging: false,
+        })
+      : await connect(
+          process.env.DB_NAME,
+          process.env.DB_USER,
+          process.env.DB_PASS,
+          {
+            host: process.env.DB_HOST,
+            port: process.env.DB_PORT,
+            dialect: process.env.DB_DIALECT,
+            logging: false,
+          }
+        );
+    console.log('database connected');
+  } catch (err) {
+    console.error('database connection failed');
+    return;
+  }
+}
+
 async function messageBus() {
   try {
     console.log('connect to message bus service...');
@@ -42,9 +72,10 @@ async function messageBus() {
 async function main(command) {
   switch (command) {
     case 'task':
-      await relationaldb();
-      await kvdb();
-      await messageBus();
+      // await relationaldb();
+      // await kvdb();
+      // await messageBus()
+      await relationshipInit();
       taskServer.run();
       break;
     case 'worker':
@@ -59,7 +90,7 @@ async function main(command) {
       performanceServer.run();
       break;
     default:
-      console.log(`${command} 5tidak dikenali`);
+      console.log(`${command} tidak dikenali`);
       console.log('command yang valid: task, worker, performance');
   }
 }
