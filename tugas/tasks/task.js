@@ -1,5 +1,4 @@
-const { read, write, del, updateStatus } = require('../lib/relationship');
-const { ERROR_WORKER_NOT_FOUND } = require('../workers/worker');
+const taskModel = require('./task.model');
 
 const ERROR_DATA_TASK_MISSING = 'data task tidak lengkap';
 const ERROR_DATA_TASK_INVALID = 'data task invalid';
@@ -8,16 +7,39 @@ const ERROR_TASK_NOT_FOUND = 'task tidak ditemukan';
 const INFO_TASK_WORKER_WAS_SUBMITTED =
   'task sudah diassigne ke pekerja tersebut';
 
-async function registerTask(data) {
+const { Op } = require('sequelize');
+
+/**
+ * task type definition
+ * @typedef {Object} taskData
+ * @property {[string]} id
+ * @property {string} name
+ * @property {number} age
+ * @property {string} bio
+ * @property {string} address
+ * @property {string} photo
+ */
+
+function rowToData(task) {
+  return {
+    id: task.id,
+    name: task.name,
+    age: task.age,
+    bio: task.bio,
+    address: task.address,
+    photo: task.photo,
+  };
+}
+
+/**
+ * register new task
+ * @param {taskData} data task profile
+ * @returns {Promise<task>} new task profile with id
+ */
+async function register(data) {
   if (!data.job || !data.status || !data.workerId || !data.document) {
     throw ERROR_DATA_TASK_MISSING;
   }
-  const task = {
-    job: data.job,
-    status: data.status,
-    assignee_id: data.workerId,
-    document: data.document,
-  };
 
   if (isNaN(data.workerId)) {
     throw ERROR_WORKER_ID_INVALID;
@@ -26,59 +48,67 @@ async function registerTask(data) {
     throw ERROR_DATA_TASK_INVALID;
   }
 
-  let workers = await read('worker');
-  var findWorker = workers.find((worker) => {
-    return worker.id == data.workerId;
-  });
-  if (!findWorker) {
-    throw ERROR_WORKER_NOT_FOUND;
-  }
+  // let worker
+  // worker = await taskModel.model.findByPk(id);
+  // if (!task) {
+  //   throw ERROR_TASK_NOT_FOUND;
+  // }
+  // let workers = await read('worker');
+  // var findWorker = workers.find((worker) => {
+  //   return worker.id == data.workerId;
+  // });
+  // if (!findWorker) {
+  //   throw ERROR_WORKER_NOT_FOUND;
+  // }
 
-  let tasks = await read('task');
-  var findTask = tasks.rows.find((taskData) => {
-    return taskData.job == data.job && taskData.assignee_id == data.workerId;
+  // let tasks = await read('task');
+  // var findTask = tasks.rows.find((taskData) => {
+  //   return taskData.job == data.job && taskData.assignee_id == data.workerId;
+  // });
+  // if (findTask) {
+  //   throw INFO_TASK_WORKER_WAS_SUBMITTED;
+  // }
+
+  const task = await taskModel.model.create({
+    job: data.job,
+    status: data.status,
+    assignee_id: data.workerId,
+    document: data.document,
   });
-  if (findTask) {
-    throw INFO_TASK_WORKER_WAS_SUBMITTED;
-  }
-  await write('task', task);
-  return task;
+  return rowToData(task);
 }
 
-async function listTask() {
-  let tasks = await read('task');
-  var filterTask = tasks.rows.filter((taskData) => {
-    return taskData.status.toLowerCase() != 'cancel';
+/**
+ * get list of registered tasks
+ * @returns {Promise<task[]>} list of registered tasks
+ */
+async function list() {
+  const res = await taskModel.model.findAll({
+    where: {
+      [Op.not]: [{ status: 'cancel' }],
+    },
   });
-  return filterTask;
+  return res.rows.map((row) => rowToData(row));
 }
 
-async function updateStatusTask(data) {
-  console.log(data);
-  if (!data.id || !data.status) {
-    throw ERROR_DATA_TASK_MISSING;
-  }
-  let tasks = await read('task');
-  if (!tasks) {
+/**
+ * remove a task by an id
+ * @param {string} id task id
+ * @returns {Promise<task>} removed task
+ */
+async function remove(id) {
+  const task = await taskModel.model.findByPk(id);
+  if (!task) {
     throw ERROR_TASK_NOT_FOUND;
   }
-  if (!['progress', 'cancel', 'done'].includes(data.status.toLowerCase())) {
-    throw ERROR_DATA_TASK_INVALID;
-  }
-  const idx = tasks.rows.findIndex((task) => task.id == data.id);
-  if (idx === -1) {
-    throw ERROR_TASK_NOT_FOUND;
-  }
-  await updateStatus(data.id, data.status);
-  tasks = await read('task');
-  const updated = tasks.rows[idx];
-  return updated.job;
+  await task.destroy();
+  return rowToData(task);
 }
 
 module.exports = {
-  registerTask,
-  listTask,
-  updateStatusTask,
+  register,
+  list,
+  remove,
   ERROR_DATA_TASK_MISSING,
   ERROR_DATA_TASK_INVALID,
   ERROR_WORKER_ID_INVALID,

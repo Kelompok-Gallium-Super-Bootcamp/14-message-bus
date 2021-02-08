@@ -2,21 +2,21 @@ const Busboy = require('busboy');
 const url = require('url');
 const { Writable } = require('stream');
 const {
-  registerTask,
-  listTask,
-  ERROR_DATA_TASK_MISSING,
+  register,
+  list,
+  remove,
   ERROR_TASK_NOT_FOUND,
-  INFO_TASK_WORKER_WAS_SUBMITTED,
-  ERROR_WORKER_ID_INVALID,
-  ERROR_DATA_TASK_INVALID,
-  updateStatusTask,
 } = require('./task');
-const { ERROR_WORKER_NOT_FOUND } = require('../workers/worker');
 const { saveFile } = require('../lib/storage');
 // eslint-disable-next-line no-unused-vars
 const { IncomingMessage, ServerResponse } = require('http');
 
-function registerTaskSvc(req, res) {
+/**
+ * service to register new worker
+ * @param {IncomingMessage} req
+ * @param {ServerResponse} res
+ */
+function registerSvc(req, res) {
   const busboy = new Busboy({ headers: req.headers });
 
   const data = {
@@ -46,7 +46,7 @@ function registerTaskSvc(req, res) {
         }
         if (finished) {
           try {
-            const task = await registerTask(data);
+            const task = await register(data);
             res.setHeader('content-type', 'application/json');
             res.write(JSON.stringify(task));
           } catch (err) {
@@ -72,7 +72,9 @@ function registerTaskSvc(req, res) {
   });
 
   busboy.on('field', (fieldname, val) => {
-    if (['job', 'status', 'workerId'].includes(fieldname)) {
+    if (
+      ['job', 'status', 'workerId'].includes(fieldname)
+    ) {
       data[fieldname] = val;
     }
   });
@@ -87,23 +89,43 @@ function registerTaskSvc(req, res) {
   req.pipe(busboy);
 }
 
-async function updateStatusTaskSvc(req, res) {
+/**
+ * service to get list of workers
+ * @param {IncomingMessage} req
+ * @param {ServerResponse} res
+ */
+async function listSvc(req, res) {
+  try {
+    const tasks = await list();
+    res.setHeader('content-type', 'application/json');
+    res.write(JSON.stringify(tasks));
+    res.end();
+  } catch (err) {
+    res.statusCode = 500;
+    res.end();
+    return;
+  }
+}
+
+/**
+ * service to remove a worker by it's id
+ * @param {IncomingMessage} req
+ * @param {ServerResponse} res
+ */
+async function removeSvc(req, res) {
   const uri = url.parse(req.url, true);
-  const data = {
-    id: uri.query['id'],
-    status: uri.query['status'],
-  };
-  if (!data.id) {
+  const id = uri.query['id'];
+  if (!id) {
     res.statusCode = 401;
     res.write('parameter id tidak ditemukan');
     res.end();
     return;
   }
   try {
-    const task = await updateStatusTask(data);
+    const task = await remove(id);
     res.setHeader('content-type', 'application/json');
     res.statusCode = 200;
-    res.write(`${task} : Task was successfully UPDATED`);
+    res.write(JSON.stringify(task));
     res.end();
   } catch (err) {
     if (err === ERROR_TASK_NOT_FOUND) {
@@ -118,21 +140,8 @@ async function updateStatusTaskSvc(req, res) {
   }
 }
 
-async function listTaskSvc(req, res) {
-  try {
-    const tasks = await listTask();
-    res.setHeader('content-type', 'application/json');
-    res.write(JSON.stringify(tasks));
-    res.end();
-  } catch (err) {
-    res.statusCode = 500;
-    res.end();
-    return;
-  }
-}
-
 module.exports = {
-  listTaskSvc,
-  registerTaskSvc,
-  updateStatusTaskSvc,
+  listSvc,
+  registerSvc,
+  removeSvc,
 };

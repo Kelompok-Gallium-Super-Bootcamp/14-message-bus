@@ -16,11 +16,11 @@ async function db() {
 async function main(command) {
   switch (command) {
     case 'task':
-      await init();
+      await db();
       taskServer.run();
       break;
     case 'worker':
-      await init();
+      await db();
       workerServer.run();
       break;
     default:

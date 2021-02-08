@@ -1,11 +1,8 @@
 const { createServer } = require('http');
 const url = require('url');
 const { stdout } = require('process');
-const {
-  registerTaskSvc,
-  listTaskSvc,
-  updateStatusTaskSvc,
-} = require('./task.service');
+const { listSvc, registerSvc, removeSvc } = require('./task.service');
+require('dotenv').config();
 
 let server;
 
@@ -14,6 +11,11 @@ let server;
  */
 function run() {
   server = createServer((req, res) => {
+    /**
+     * write http response message
+     * @param {number} statusCode http response code, default to 200
+     * @param {string} message respose message
+     */
     function respond(statusCode, message) {
       res.statusCode = statusCode || 200;
       res.write(message || '');
@@ -24,23 +26,23 @@ function run() {
     try {
       const uri = url.parse(req.url, true);
       switch (uri.pathname) {
-        case '/tasks/add':
+        case '/register':
           if (req.method === 'POST') {
-            return registerTaskSvc(req, res);
+            return registerSvc(req, res);
           } else {
             respond(404);
           }
           break;
-        case '/tasks/update/status':
-          if (req.method === 'POST') {
-            return updateStatusTaskSvc(req, res);
-          } else {
-            respond(404);
-          }
-          break;
-        case '/tasks/list':
+        case '/list':
           if (req.method === 'GET') {
-            return listTaskSvc(req, res);
+            return listSvc(req, res);
+          } else {
+            respond(404);
+          }
+          break;
+        case '/remove':
+          if (req.method === 'DELETE') {
+            return removeSvc(req, res);
           } else {
             respond(404);
           }
@@ -54,9 +56,9 @@ function run() {
   });
 
   // run server
-  const PORT = 9999;
+  const PORT = process.env.TASK_PORT;
   server.listen(PORT, () => {
-    stdout.write(`🚀 server listening on port ${PORT}\n`);
+    stdout.write(`🚀 Task Server listening on port ${PORT}\n`);
   });
 }
 

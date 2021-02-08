@@ -9,7 +9,7 @@ const { Client } = require('minio');
  * set MINIO_ROOT_USER=local-minio
  * set MINIO_ROOT_PASSWORD=local-test-secret
  */
-const client = new Client({
+const minioClient = new Client({
   endPoint: '127.0.0.1',
   port: 9000,
   useSSL: false,
@@ -35,12 +35,28 @@ function randomFileName(mimetype) {
 function saveFile(bucket, file, mimetype) {
   const destname = randomFileName(mimetype);
   return new Promise((resolve, reject) => {
+    // Check Bucket
+    minioClient.bucketExists(bucket, function (err, exists) {
+      if (err) {
+        throw err;
+      }
+      if (!exists) {
+        minioClient.makeBucket('europetrip', 'us-east-1', function (err) {
+          if (err) throw err;
+          console.log('Bucket created successfully in "us-east-1".');
+        });
+      } else if (exists) {
+        console.log('Bucket exists.');
+      }
+    });
+
+    // Store File to Bucket
     client.putObject(bucket, destname, file, (err, etag) => {
-			if (err) {
-				reject(err);
-			}
-			resolve(destname);
-		});
+      if (err) {
+        reject(err);
+      }
+      resolve(destname);
+    });
   });
 }
 
