@@ -1,5 +1,3 @@
-const fs = require('fs');
-const path = require('path');
 const mime = require('mime-types');
 // eslint-disable-next-line no-unused-vars
 const { Readable } = require('stream');
@@ -13,8 +11,8 @@ const minioClient = new Client({
   endPoint: '127.0.0.1',
   port: 9000,
   useSSL: false,
-  accessKey: 'local-minio',
-  secretKey: 'local-test-secret',
+  accessKey: 'minio',
+  secretKey: 'miniostorage',
 });
 
 /**

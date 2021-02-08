@@ -9,8 +9,7 @@ const {
   ERROR_WORKER_NOT_FOUND,
 } = require('./worker');
 const { saveFile } = require('../lib/storage');
-// eslint-disable-next-line no-unused-vars
-const { IncomingMessage, ServerResponse } = require('http');
+const { addWorkerLog, removeWorkerLog } = require('./worker.nats');
 
 function registerSvc(req, res) {
   const busboy = new Busboy({ headers: req.headers });
@@ -24,6 +23,8 @@ function registerSvc(req, res) {
     photo: '',
   };
 
+  let finished = false;
+
   function abort() {
     req.unpipe(busboy);
     if (!req.aborted) {
@@ -35,11 +36,26 @@ function registerSvc(req, res) {
   busboy.on('file', async (fieldname, file, filename, encoding, mimetype) => {
     switch (fieldname) {
       case 'photo':
-				file.on('error', abort);
         try {
           data.photo = await saveFile('photo', file, mimetype);
         } catch (err) {
           abort();
+        }
+        if (finished) {
+          try {
+            const worker = await register(data);
+            addWorkerLog();
+            res.setHeader('content-type', 'application/json');
+            res.write(JSON.stringify(worker));
+          } catch (err) {
+            if (err === ERROR_REGISTER_DATA_INVALID) {
+              res.statusCode = 401;
+            } else {
+              res.statusCode = 500;
+            }
+            res.write(err);
+          }
+          res.end();
         }
         break;
       default: {
@@ -62,19 +78,7 @@ function registerSvc(req, res) {
   });
 
   busboy.on('finish', async () => {
-    try {
-			const worker = await register(data);
-			res.setHeader('content-type', 'application/json');
-			res.write(JSON.stringify(worker));
-		} catch (err) {
-			if (err === ERROR_REGISTER_DATA_INVALID) {
-				res.statusCode = 401;
-			} else {
-				res.statusCode = 500;
-			}
-			res.write(err);
-		}
-		res.end();
+    finished = true;
   });
 
   req.on('aborted', abort);
@@ -100,13 +104,15 @@ async function removeSvc(req, res) {
   const uri = url.parse(req.url, true);
   const id = uri.query['id'];
   if (!id) {
+    const ERROR_ID_NOT_FOUND = 'parameter id tidak ditemukan';
     res.statusCode = 401;
-    res.write('parameter id tidak ditemukan');
+    res.write(ERROR_ID_NOT_FOUND);
     res.end();
     return;
   }
   try {
     const worker = await remove(parseInt(id));
+    removeWorkerLog();
     res.setHeader('content-type', 'application/json');
     res.statusCode = 200;
     res.write(JSON.stringify(worker));
